@@ -279,8 +279,12 @@ footer { text-align: center; padding: 1.5rem; font-size: .74rem; color: var(--mu
 
   <!-- RESUMEN -->
   <div class="resumen">
-    <div class="res-title">📊 Tabla de posiciones</div>
+    <div class="res-title">🏆 Ganadores por partido</div>
     <div class="scores-grid" id="scores-grid"></div>
+    <div id="ganadores-partidos"></div>
+
+    <div id="ganadores-lista"></div>
+  </div>
 </div>
 
 <footer>Mundial 2026 🇨🇴 · Grupo K · Partido Inaugural · Hecho con pasión tricolor</footer>
@@ -618,7 +622,12 @@ function renderTabla(pId) {
       marcCell = `<span style="color:var(--muted);font-size:.8rem;">Sin pronóstico</span>
         ${adminActivo ? `<button class="btn-admin-edit" onclick="abrirAdminEdit(${pId},'${par.id}')">✏️ agregar</button>` : ''}`;
     } else {
-      marcCell = `<button class="btn-ok" onclick="abrirModalPron(${pId},'${par.id}','${par.nombre.replace(/'/g,"\\'")}')">Ingresar pronóstico</button>`;
+      const yaInicio = new Date() >= PARTIDO_INICIO[pId];
+      if (yaInicio) {
+        marcCell = `<span style="color:var(--muted);font-size:.78rem;">⏰ Partido iniciado</span>`;
+      } else {
+        marcCell = `<button class="btn-ok" onclick="abrirModalPron(${pId},'${par.id}','${par.nombre.replace(/'/g,"\\'")}')">Ingresar pronóstico</button>`;
+      }
     }
 
     const confCell = (pr && pr.confirmado)
@@ -855,6 +864,7 @@ async function adminEliminarParticipante(parId, nombre) {
    RESUMEN
 ═══════════════════════════════════════ */
 function renderResumen() {
+  // ── Tarjetas de marcadores reales ──
   const sg=document.getElementById('scores-grid');
   sg.innerHTML=[0,1,2,3].map(pId=>{
     const info=PARTIDOS_INFO[pId];
@@ -863,31 +873,74 @@ function renderResumen() {
       <div class="sc-label">${info.etiqueta} · ${info.local} vs ${info.visita}</div>
       <div class="sc-num pend">Por jugar</div>
     </div>`;
-    const who=r.goles_local>r.goles_visita?`${info.local} gana`:r.goles_local<r.goles_visita?`${info.visita} gana`:'Empate';
+    const who=r.goles_local>r.goles_visita?`🏠 ${info.local} gana`:r.goles_local<r.goles_visita?`✈️ ${info.visita} gana`:'🤝 Empate';
     return `<div class="score-card">
       <div class="sc-label">${info.etiqueta} · ${info.local} vs ${info.visita}</div>
       <div class="sc-num">${r.goles_local} — ${r.goles_visita}</div>
-      <div class="sc-desc">${who}${r.auto_confirmado?' · automático':''}</div>
+      <div class="sc-desc">${who}${r.auto_confirmado?' · auto':''}</div>
     </div>`;
   }).join('');
 
-  const tbody=document.getElementById('body-resumen');
-  if (participantes.length===0) {
-    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:.85rem;">Sin participantes aún.</td></tr>`;
+  // ── Ganadores por partido ──
+  const gl=document.getElementById('ganadores-lista');
+  const partidosConResultado = [0,1,2,3].filter(pId=>resultados[pId]&&resultados[pId].confirmado);
+
+  if (partidosConResultado.length===0) {
+    gl.innerHTML=`<div style="text-align:center;color:var(--muted);padding:2rem;font-size:.85rem;">Los ganadores aparecerán aquí cuando finalice cada partido.</div>`;
     return;
   }
-  const scores=participantes.map(par=>{
-    let total=0,exactos=0;
-    [0,1,2,3].forEach(pId=>{const pts=calcPts(pId,par.id);if(pts!==null){total+=pts;if(pts===3)exactos++;}});
-    return {nombre:par.nombre,dep:par.dependencia,total,exactos};
-  }).sort((a,b)=>b.total-a.total||b.exactos-a.exactos);
-  tbody.innerHTML=scores.map((s,i)=>`<tr>
-    <td style="color:var(--muted);font-size:.82rem;">${i===0&&s.total>0?'🏆':`${i+1}°`}</td>
-    <td style="font-weight:500;">${s.nombre}</td>
-    <td style="color:var(--muted);font-size:.82rem;">${s.dep}</td>
-    <td class="c">${s.exactos>0?`<span class="exact-star">${s.exactos} ⭐</span>`:'—'}</td>
-    <td class="c"><span class="pts-pill">${s.total} pts</span></td>
-  </tr>`).join('');
+
+  gl.innerHTML = partidosConResultado.map(pId=>{
+    const info=PARTIDOS_INFO[pId];
+    const r=resultados[pId];
+
+    const exactos = participantes.filter(par=>{
+      const pts=calcPts(pId,par.id);
+      return pts===3;
+    });
+    const resultado = participantes.filter(par=>{
+      const pts=calcPts(pId,par.id);
+      return pts===1;
+    });
+
+    const filaExactos = exactos.length>0
+      ? exactos.map(p=>`<tr>
+          <td><span style="color:var(--amarillo);font-size:1rem;">⭐</span></td>
+          <td style="font-weight:600;color:var(--amarillo);">${p.nombre}</td>
+          <td style="color:var(--muted);font-size:.8rem;">${p.dependencia}</td>
+          <td class="c"><span class="badge b-win">Exacto ✓</span></td>
+        </tr>`).join('')
+      : `<tr><td colspan="4" style="color:var(--muted);font-size:.8rem;padding:.5rem 1rem;">Nadie acertó el marcador exacto</td></tr>`;
+
+    const filaResultado = resultado.length>0
+      ? resultado.map(p=>`<tr>
+          <td><span style="color:var(--draw);font-size:.9rem;">~</span></td>
+          <td style="font-weight:500;">${p.nombre}</td>
+          <td style="color:var(--muted);font-size:.8rem;">${p.dependencia}</td>
+          <td class="c"><span class="badge b-draw">Resultado ~</span></td>
+        </tr>`).join('')
+      : '';
+
+    return `<div style="margin-bottom:2rem;">
+      <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:.75rem;">
+        ${info.etiqueta} · ${info.local} ${r.goles_local} — ${r.goles_visita} ${info.visita}
+      </div>
+      <div class="tabla-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:30px;"></th>
+            <th>Participante</th>
+            <th>Dependencia</th>
+            <th class="c">Acierto</th>
+          </tr></thead>
+          <tbody>
+            ${filaExactos}
+            ${filaResultado}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 /* ═══════════════════════════════════════
