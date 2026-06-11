@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pronósticos Colombia — Mundial 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --amarillo: #FCD116;
+  --azul: #003087;
+  --rojo: #CE1126;
+  --bg: #080d1a;
+  --surface: #0f1626;
+  --card: #141e30;
+  --border: rgba(252,209,22,0.18);
+  --border2: rgba(255,255,255,0.07);
+  --text: #eef2ff;
+  --muted: #7a8daa;
+  --win: #22c55e;
+  --draw: #f59e0b;
+  --loss: #ef4444;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* ── HERO ── */
+.hero {
+  background: linear-gradient(160deg, #080d1a 0%, #0b1835 55%, #160510 100%);
+  border-bottom: 2px solid var(--amarillo);
+  padding: 2.5rem 1rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(252,209,22,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.flag { display: flex; justify-content: center; gap: 2px; margin-bottom: 1.2rem; }
+.flag span { height: 5px; border-radius: 3px; }
+.flag .f1 { width: 64px; background: var(--amarillo); }
+.flag .f2 { width: 32px; background: var(--azul); }
+.flag .f3 { width: 32px; background: var(--rojo); }
+.hero h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.6rem,6vw,4.5rem); letter-spacing: .04em; color: var(--amarillo); line-height: 1; margin-bottom: .35rem; }
+.hero .sub { font-size: .8rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+
+/* ── CONTENEDOR ── */
+.wrap { max-width: 1080px; margin: 0 auto; padding: 2rem 1rem 5rem; }
+
+/* ── REGISTRO ── */
+.registro-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+.section-label {
+  font-size: .7rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--muted); margin-bottom: 1rem;
+}
+.reg-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+@media(max-width:640px){ .reg-form { grid-template-columns: 1fr 1fr; } }
+.field label { display: block; font-size: .72rem; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+.field input {
+  width: 100%; height: 40px; background: var(--bg);
+  border: 1px solid rgba(252,209,22,.25); border-radius: 7px;
+  color: var(--text); font-size: .9rem; font-family: 'Inter',sans-serif;
+  padding: 0 12px; transition: border-color .2s;
+}
+.field input:focus { outline: none; border-color: var(--amarillo); }
+.btn-add {
+  height: 40px; background: var(--amarillo); color: var(--bg);
+  border: none; border-radius: 7px; padding: 0 1.2rem;
+  font-size: .88rem; font-weight: 600; font-family: 'Inter',sans-serif;
+  cursor: pointer; white-space: nowrap; transition: opacity .15s, transform .1s;
+}
+.btn-add:hover { opacity: .88; transform: translateY(-1px); }
+
+/* ── PARTIDO ── */
+.partido-block { margin-bottom: 3rem; }
+.partido-head {
+  display: flex; align-items: center; gap: .9rem;
+  margin-bottom: 1.1rem; flex-wrap: wrap;
+}
+.p-badge {
+  font-family: 'Bebas Neue', sans-serif; font-size: .72rem; letter-spacing: .1em;
+  background: var(--amarillo); color: var(--bg); padding: 3px 10px; border-radius: 3px;
+}
+.p-matchup { font-size: 1rem; font-weight: 600; }
+.p-matchup .vs { color: var(--muted); font-weight: 400; font-size: .82rem; margin: 0 5px; }
+.p-meta { font-size: .75rem; color: var(--muted); margin-left: auto; text-align: right; line-height: 1.5; }
+.p-divider { height: 1px; background: var(--border); margin-bottom: 1.1rem; }
+
+/* ── TABLA ── */
+.tabla-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border2); }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+thead th {
+  background: var(--card); color: var(--muted);
+  font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em;
+  padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--border2);
+}
+th.c, td.c { text-align: center; }
+tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); transition: background .15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(252,209,22,.025); }
+tbody td { padding: .65rem 1rem; vertical-align: middle; }
+.td-name { font-weight: 500; }
+.td-dep, .td-cel { font-size: .8rem; color: var(--muted); }
+
+/* marcador input */
+.marc { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.marc input {
+  width: 42px; height: 34px; background: #0a0f1e;
+  border: 1px solid rgba(252,209,22,.3); border-radius: 6px;
+  color: var(--amarillo); font-size: .95rem; font-weight: 600;
+  text-align: center; -moz-appearance: textfield;
+  transition: border-color .2s;
+}
+.marc input::-webkit-inner-spin-button, .marc input::-webkit-outer-spin-button { -webkit-appearance: none; }
+.marc input:focus { outline: none; border-color: var(--amarillo); }
+.marc input:disabled { opacity: .55; cursor: not-allowed; background: #070c18; border-color: rgba(255,255,255,.08); color: var(--muted); }
+.marc-sep { color: var(--muted); font-weight: 600; user-select: none; }
+
+/* confirm-row inline */
+.confirm-cell { white-space: nowrap; }
+.btn-ok {
+  height: 30px; padding: 0 12px; border-radius: 5px;
+  background: rgba(252,209,22,.12); color: var(--amarillo);
+  border: 1px solid rgba(252,209,22,.3); font-size: .78rem; font-weight: 600;
+  font-family: 'Inter',sans-serif; cursor: pointer; transition: background .15s;
+}
+.btn-ok:hover { background: rgba(252,209,22,.22); }
+.confirmed-mark { font-size: .78rem; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.confirmed-mark svg { flex-shrink: 0; }
+
+/* badge resultado */
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.b-win  { background: rgba(34,197,94,.14);  color: var(--win);  border: 1px solid rgba(34,197,94,.3); }
+.b-draw { background: rgba(245,158,11,.14); color: var(--draw); border: 1px solid rgba(245,158,11,.3); }
+.b-loss { background: rgba(239,68,68,.14);  color: var(--loss); border: 1px solid rgba(239,68,68,.3); }
+.b-pend { color: var(--muted); border: 1px solid rgba(255,255,255,.1); font-size: .66rem; }
+
+/* confirmar resultado real */
+.final-row {
+  display: flex; align-items: center; gap: 12px; margin-top: 1rem; flex-wrap: wrap;
+}
+.btn-final {
+  height: 38px; padding: 0 1.3rem; background: var(--amarillo); color: var(--bg);
+  border: none; border-radius: 7px; font-size: .84rem; font-weight: 600;
+  font-family: 'Inter',sans-serif; cursor: pointer; transition: opacity .15s, transform .1s;
+}
+.btn-final:hover { opacity: .88; transform: translateY(-1px); }
+.btn-final:disabled { background: #1e2535; color: #444; cursor: not-allowed; transform: none; }
+.lock-tag { font-size: .77rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+
+/* ── RESUMEN ── */
+.resumen {
+  margin-top: 3.5rem; padding: 1.75rem;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+}
+.res-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: .06em; color: var(--amarillo); margin-bottom: 1.25rem; }
+.scores-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px,1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+.score-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+.sc-label { font-size: .67rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 4px; }
+.sc-num { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; color: var(--amarillo); line-height: 1; }
+.sc-num.pend { font-size: 1rem; color: var(--muted); font-family: 'Inter',sans-serif; }
+.sc-desc { font-size: .77rem; color: var(--muted); margin-top: 2px; }
+
+.pos-table { width: 100%; border-collapse: collapse; }
+.pos-table th { font-size: .67rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.pos-table td { padding: 8px 12px; font-size: .85rem; border-bottom: 1px solid rgba(255,255,255,.04); }
+.pos-table tr:last-child td { border-bottom: none; }
+.pts-pill { display: inline-block; background: rgba(252,209,22,.12); color: var(--amarillo); border-radius: 4px; padding: 2px 9px; font-size: .78rem; font-weight: 600; }
+.exact-star { color: var(--amarillo); font-weight: 600; }
+
+footer { text-align: center; padding: 1.5rem; font-size: .74rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; }
+
+/* modal overlay */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.7); z-index: 100;
+  align-items: center; justify-content: center;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 14px; padding: 2rem; max-width: 400px; width: 90%;
+}
+.modal h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: .35rem; }
+.modal p { font-size: .85rem; color: var(--muted); margin-bottom: 1.25rem; }
+.modal-fields { display: flex; flex-direction: column; gap: .9rem; margin-bottom: 1.5rem; }
+.modal-fields label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 5px; }
+.modal-fields input {
+  width: 100%; height: 40px; background: var(--bg);
+  border: 1px solid rgba(252,209,22,.25); border-radius: 7px;
+  color: var(--text); font-size: .92rem; font-family: 'Inter',sans-serif;
+  padding: 0 12px;
+}
+.modal-fields input:focus { outline: none; border-color: var(--amarillo); }
+.marc-pair { display: flex; align-items: center; gap: 10px; }
+.marc-pair input { width: 60px; height: 44px; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--amarillo); }
+.marc-pair .sep { font-size: 1.3rem; color: var(--muted); }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-cancel { height: 38px; padding: 0 1.1rem; background: transparent; color: var(--muted); border: 1px solid var(--border2); border-radius: 7px; font-family: 'Inter',sans-serif; font-size: .85rem; cursor: pointer; }
+.btn-confirm-ok { height: 38px; padding: 0 1.3rem; background: var(--amarillo); color: var(--bg); border: none; border-radius: 7px; font-family: 'Inter',sans-serif; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.modal-warn { font-size: .77rem; color: var(--draw); margin-top: 1rem; display: none; }
+</style>
+</head>
+<body>
+
+<!-- ══ HERO ══ -->
+<header class="hero">
+  <div class="flag"><span class="f1"></span><span class="f2"></span><span class="f3"></span></div>
+  <h1>Pronósticos Colombia</h1>
+  <p class="sub">Grupo K &nbsp;·&nbsp; Mundial 2026</p>
+</header>
+
+<div class="wrap">
+
+  <!-- ══ REGISTRO ══ -->
+  <div class="registro-section">
+    <div class="section-label">Registrar participante</div>
+    <div class="reg-form">
+      <div class="field"><label>Nombre completo</label><input id="r-nombre" type="text" placeholder="Tu nombre" autocomplete="off"></div>
+      <div class="field"><label>Dependencia</label><input id="r-dep" type="text" placeholder="Área o dependencia" autocomplete="off"></div>
+      <div class="field"><label>Celular</label><input id="r-cel" type="tel" placeholder="300 000 0000" autocomplete="off"></div>
+      <button class="btn-add" onclick="agregarParticipante()">+ Agregar</button>
+    </div>
+    <div id="reg-error" style="color:#ef4444;font-size:.8rem;margin-top:.6rem;display:none;"></div>
+  </div>
+
+  <!-- ══ PARTIDO 1 ══ -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 1</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇺🇿 Uzbekistán</span>
+      <span class="p-meta">17 Jun · 9:00 p.m. COT<br>Estadio Azteca · Ciudad de México</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr>
+        <th>Participante</th><th>Dependencia</th><th>Celular</th>
+        <th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th>
+      </tr></thead>
+      <tbody id="body-1"></tbody>
+    </table></div>
+    <div class="final-row">
+      <button class="btn-final" id="fbtn-1" onclick="abrirModalFinal(1)">Confirmar resultado real del partido</button>
+      <span class="lock-tag" id="flock-1" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Resultado bloqueado
+      </span>
+    </div>
+  </section>
+
+  <!-- ══ PARTIDO 2 ══ -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 2</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇨🇩 RD Congo</span>
+      <span class="p-meta">23 Jun · 8:00 p.m. COT<br>Estadio Akron · Guadalajara</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr>
+        <th>Participante</th><th>Dependencia</th><th>Celular</th>
+        <th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th>
+      </tr></thead>
+      <tbody id="body-2"></tbody>
+    </table></div>
+    <div class="final-row">
+      <button class="btn-final" id="fbtn-2" onclick="abrirModalFinal(2)">Confirmar resultado real del partido</button>
+      <span class="lock-tag" id="flock-2" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Resultado bloqueado
+      </span>
+    </div>
+  </section>
+
+  <!-- ══ PARTIDO 3 ══ -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 3</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇵🇹 Portugal</span>
+      <span class="p-meta">27 Jun · 6:30 p.m. COT<br>Hard Rock Stadium · Miami</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr>
+        <th>Participante</th><th>Dependencia</th><th>Celular</th>
+        <th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th>
+      </tr></thead>
+      <tbody id="body-3"></tbody>
+    </table></div>
+    <div class="final-row">
+      <button class="btn-final" id="fbtn-3" onclick="abrirModalFinal(3)">Confirmar resultado real del partido</button>
+      <span class="lock-tag" id="flock-3" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Resultado bloqueado
+      </span>
+    </div>
+  </section>
+
+  <!-- ══ RESUMEN ══ -->
+  <div class="resumen">
+    <div class="res-title">📊 Tabla de posiciones</div>
+    <div class="scores-grid" id="scores-grid"></div>
+    <div class="tabla-wrap"><table class="pos-table">
+      <thead><tr><th>#</th><th>Participante</th><th>Dependencia</th><th class="c">Exactos</th><th class="c">Puntos</th></tr></thead>
+      <tbody id="body-resumen"></tbody>
+    </table></div>
+  </div>
+
+</div>
+<footer>Colombia 🇨🇴 — Grupo K · Mundial 2026 · Hecho con pasión tricolor</footer>
+
+<!-- ══ MODAL CONFIRMACIÓN PRONÓSTICO ══ -->
+<div class="modal-bg" id="modal-pron">
+  <div class="modal">
+    <h2 id="mp-title">Confirmar tu pronóstico</h2>
+    <p id="mp-sub">Ingresa el marcador que pronosticas. Una vez confirmado no podrás cambiarlo.</p>
+    <div class="modal-fields">
+      <div>
+        <label>Tu nombre (debe coincidir con el registrado)</label>
+        <input id="mp-nombre" type="text" placeholder="Nombre exacto">
+      </div>
+      <div>
+        <label id="mp-marc-label">Marcador (Colombia — Rival)</label>
+        <div class="marc-pair">
+          <input id="mp-col" type="number" min="0" max="20" placeholder="0">
+          <span class="sep">—</span>
+          <input id="mp-riv" type="number" min="0" max="20" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-warn" id="mp-warn"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModalPron()">Cancelar</button>
+      <button class="btn-confirm-ok" onclick="confirmarPron()">Confirmar pronóstico</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL RESULTADO FINAL ══ -->
+<div class="modal-bg" id="modal-final">
+  <div class="modal">
+    <h2 id="mf-title">Resultado real del partido</h2>
+    <p>Ingresa el marcador final. <strong>Esta acción es irreversible</strong> y bloqueará todos los pronósticos.</p>
+    <div class="modal-fields">
+      <div>
+        <label id="mf-marc-label">Marcador final (Colombia — Rival)</label>
+        <div class="marc-pair">
+          <input id="mf-col" type="number" min="0" max="30" placeholder="0">
+          <span class="sep">—</span>
+          <input id="mf-riv" type="number" min="0" max="30" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-warn" id="mf-warn"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModalFinal()">Cancelar</button>
+      <button class="btn-confirm-ok" onclick="confirmarFinal()">🔒 Confirmar y bloquear</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   ESTADO
+═══════════════════════════════════════════ */
+const STORE = 'mundial_col_2026_v2';
+
+let state = {
+  participantes: [],   // [{nombre, dep, cel}]
+  pronosticos: {       // pId -> idx -> {col, riv, confirmado}
+    1: {}, 2: {}, 3: {}
+  },
+  partidos: {
+    1: { rival:'Uzbekistán', confirmado:false, gCol:null, gRiv:null },
+    2: { rival:'RD Congo',   confirmado:false, gCol:null, gRiv:null },
+    3: { rival:'Portugal',   confirmado:false, gCol:null, gRiv:null }
+  }
+};
+
+function save() { localStorage.setItem(STORE, JSON.stringify(state)); }
+function load() {
+  const r = localStorage.getItem(STORE);
+  if (r) { try { state = JSON.parse(r); } catch(e) {} }
+  // asegurar estructura
+  [1,2,3].forEach(p => { if (!state.pronosticos[p]) state.pronosticos[p] = {}; });
+}
+
+/* ═══════════════════════════════════════════
+   PARTICIPANTES
+═══════════════════════════════════════════ */
+function agregarParticipante() {
+  const nombre = document.getElementById('r-nombre').value.trim();
+  const dep    = document.getElementById('r-dep').value.trim();
+  const cel    = document.getElementById('r-cel').value.trim();
+  const err    = document.getElementById('reg-error');
+
+  if (!nombre || !dep || !cel) { showErr(err, 'Completa todos los campos.'); return; }
+  if (state.participantes.find(p => p.nombre.toLowerCase() === nombre.toLowerCase())) {
+    showErr(err, 'Ya existe un participante con ese nombre.'); return;
+  }
+  err.style.display = 'none';
+  state.participantes.push({ nombre, dep, cel });
+  // inicializar slots
+  const idx = state.participantes.length - 1;
+  [1,2,3].forEach(pId => { state.pronosticos[pId][idx] = { col:'', riv:'', confirmado:false }; });
+  save();
+  document.getElementById('r-nombre').value = '';
+  document.getElementById('r-dep').value = '';
+  document.getElementById('r-cel').value = '';
+  renderAll();
+}
+
+function showErr(el, msg) { el.textContent = msg; el.style.display = 'block'; }
+
+/* ═══════════════════════════════════════════
+   RENDER TABLAS
+═══════════════════════════════════════════ */
+function renderTabla(pId) {
+  const tbody = document.getElementById('body-' + pId);
+  const p = state.partidos[pId];
+
+  if (state.participantes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;font-size:.85rem;">Aún no hay participantes registrados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = state.participantes.map((par, idx) => {
+    const pr = state.pronosticos[pId][idx] || { col:'', riv:'', confirmado:false };
+    const pConf = p.confirmado;
+
+    // columna marcador
+    let marcCell;
+    if (pr.confirmado) {
+      marcCell = `<div class="marc">
+        <span style="color:var(--amarillo);font-weight:600;font-size:1rem;">${pr.col}</span>
+        <span class="marc-sep">—</span>
+        <span style="color:var(--amarillo);font-weight:600;font-size:1rem;">${pr.riv}</span>
+      </div>`;
+    } else if (pConf) {
+      marcCell = `<span style="color:var(--muted);font-size:.8rem;">Sin pronóstico</span>`;
+    } else {
+      marcCell = `<button class="btn-ok" onclick="abrirModalPron(${pId},${idx},'${par.nombre}')">Ingresar pronóstico</button>`;
+    }
+
+    // confirmado por
+    let confCell;
+    if (pr.confirmado) {
+      confCell = `<span class="confirmed-mark">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--win)" stroke-width="2.5" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        ${par.nombre.split(' ')[0]}
+      </span>`;
+    } else {
+      confCell = `<span style="color:var(--muted);font-size:.75rem;">Pendiente</span>`;
+    }
+
+    return `<tr>
+      <td class="td-name">${par.nombre}</td>
+      <td class="td-dep">${par.dep}</td>
+      <td class="td-cel">${par.cel}</td>
+      <td class="c confirm-cell">${marcCell}</td>
+      <td class="c">${confCell}</td>
+      <td class="c">${resultadoBadge(pId, idx)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function resultadoBadge(pId, idx) {
+  const p = state.partidos[pId];
+  if (!p.confirmado) return `<span class="badge b-pend">Pendiente</span>`;
+  const pr = state.pronosticos[pId][idx];
+  if (!pr || !pr.confirmado) return `<span class="badge b-loss">Sin pronóstico</span>`;
+  const pCol = parseInt(pr.col), pRiv = parseInt(pr.riv);
+  const pts = calcPts(pId, idx);
+  if (pts === 3) return `<span class="badge b-win">✓ Exacto</span>`;
+  if (pts === 1) return `<span class="badge b-draw">~ Resultado</span>`;
+  return `<span class="badge b-loss">✗ Fallado</span>`;
+}
+
+function calcPts(pId, idx) {
+  const p = state.partidos[pId];
+  if (!p.confirmado) return null;
+  const pr = state.pronosticos[pId][idx];
+  if (!pr || !pr.confirmado) return 0;
+  const pCol = parseInt(pr.col), pRiv = parseInt(pr.riv);
+  if (pCol === p.gCol && pRiv === p.gRiv) return 3;
+  return Math.sign(pCol - pRiv) === Math.sign(p.gCol - p.gRiv) ? 1 : 0;
+}
+
+/* ═══════════════════════════════════════════
+   MODAL PRONÓSTICO
+═══════════════════════════════════════════ */
+let _mp = { pId: null, idx: null };
+
+function abrirModalPron(pId, idx, nombre) {
+  _mp = { pId, idx };
+  const rival = state.partidos[pId].rival;
+  document.getElementById('mp-title').textContent = `Partido ${pId} · Colombia vs ${rival}`;
+  document.getElementById('mp-marc-label').textContent = `Marcador (Colombia — ${rival})`;
+  document.getElementById('mp-nombre').value = '';
+  document.getElementById('mp-col').value = '';
+  document.getElementById('mp-riv').value = '';
+  document.getElementById('mp-warn').style.display = 'none';
+  document.getElementById('modal-pron').classList.add('open');
+}
+
+function cerrarModalPron() {
+  document.getElementById('modal-pron').classList.remove('open');
+}
+
+function confirmarPron() {
+  const nombre = document.getElementById('mp-nombre').value.trim();
+  const col    = document.getElementById('mp-col').value;
+  const riv    = document.getElementById('mp-riv').value;
+  const warn   = document.getElementById('mp-warn');
+  const par    = state.participantes[_mp.idx];
+
+  if (nombre.toLowerCase() !== par.nombre.toLowerCase()) {
+    warn.textContent = `⚠️ El nombre no coincide. Debes ingresar exactamente: "${par.nombre}"`;
+    warn.style.display = 'block'; return;
+  }
+  if (col === '' || riv === '') {
+    warn.textContent = '⚠️ Ingresa ambos marcadores.';
+    warn.style.display = 'block'; return;
+  }
+  const gc = parseInt(col), gr = parseInt(riv);
+  if (isNaN(gc) || isNaN(gr) || gc < 0 || gr < 0) {
+    warn.textContent = '⚠️ Marcadores deben ser números ≥ 0.';
+    warn.style.display = 'block'; return;
+  }
+
+  state.pronosticos[_mp.pId][_mp.idx] = { col: gc, riv: gr, confirmado: true };
+  save();
+  cerrarModalPron();
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════
+   MODAL RESULTADO FINAL
+═══════════════════════════════════════════ */
+let _mf = { pId: null };
+
+function abrirModalFinal(pId) {
+  _mf.pId = pId;
+  const rival = state.partidos[pId].rival;
+  document.getElementById('mf-title').textContent = `Resultado real · Colombia vs ${rival}`;
+  document.getElementById('mf-marc-label').textContent = `Marcador final (Colombia — ${rival})`;
+  document.getElementById('mf-col').value = '';
+  document.getElementById('mf-riv').value = '';
+  document.getElementById('mf-warn').style.display = 'none';
+  document.getElementById('modal-final').classList.add('open');
+}
+
+function cerrarModalFinal() {
+  document.getElementById('modal-final').classList.remove('open');
+}
+
+function confirmarFinal() {
+  const col  = document.getElementById('mf-col').value;
+  const riv  = document.getElementById('mf-riv').value;
+  const warn = document.getElementById('mf-warn');
+  const pId  = _mf.pId;
+  const rival = state.partidos[pId].rival;
+
+  if (col === '' || riv === '') {
+    warn.textContent = '⚠️ Ingresa ambos marcadores.';
+    warn.style.display = 'block'; return;
+  }
+  const gc = parseInt(col), gr = parseInt(riv);
+  if (isNaN(gc) || isNaN(gr) || gc < 0 || gr < 0) {
+    warn.textContent = '⚠️ Valores inválidos.';
+    warn.style.display = 'block'; return;
+  }
+
+  state.partidos[pId].confirmado = true;
+  state.partidos[pId].gCol = gc;
+  state.partidos[pId].gRiv = gr;
+  save();
+  cerrarModalFinal();
+
+  const btn = document.getElementById('fbtn-' + pId);
+  btn.disabled = true;
+  btn.textContent = `Colombia ${gc} — ${gr} ${rival}`;
+  document.getElementById('flock-' + pId).style.display = 'flex';
+
+  renderAll();
+}
+
+/* ═══════════════════════════════════════════
+   RESUMEN
+═══════════════════════════════════════════ */
+const RIVALES = { 1:'Uzbekistán', 2:'RD Congo', 3:'Portugal' };
+
+function renderResumen() {
+  // tarjetas marcadores
+  const sg = document.getElementById('scores-grid');
+  sg.innerHTML = [1,2,3].map(pId => {
+    const p = state.partidos[pId];
+    if (!p.confirmado) return `<div class="score-card">
+      <div class="sc-label">Partido ${pId} · vs ${p.rival}</div>
+      <div class="sc-num pend">Por jugar</div>
+    </div>`;
+    const who = p.gCol > p.gRiv ? '🇨🇴 Colombia gana'
+              : p.gCol < p.gRiv ? `Colombia pierde`
+              : '🤝 Empate';
+    return `<div class="score-card">
+      <div class="sc-label">Partido ${pId} · vs ${p.rival}</div>
+      <div class="sc-num">${p.gCol} — ${p.gRiv}</div>
+      <div class="sc-desc">${who}</div>
+    </div>`;
+  }).join('');
+
+  // tabla posiciones
+  const tbody = document.getElementById('body-resumen');
+  if (state.participantes.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:.85rem;">Sin participantes aún.</td></tr>`;
+    return;
+  }
+
+  const scores = state.participantes.map((par, idx) => {
+    let total = 0, exactos = 0;
+    [1,2,3].forEach(pId => {
+      const pts = calcPts(pId, idx);
+      if (pts !== null) { total += pts; if (pts === 3) exactos++; }
+    });
+    return { nombre: par.nombre, dep: par.dep, total, exactos };
+  }).sort((a,b) => b.total - a.total || b.exactos - a.exactos);
+
+  tbody.innerHTML = scores.map((s,i) => {
+    const pos = i === 0 && s.total > 0 ? '🏆' : `${i+1}°`;
+    return `<tr>
+      <td style="color:var(--muted);font-size:.82rem;">${pos}</td>
+      <td style="font-weight:500;">${s.nombre}</td>
+      <td style="color:var(--muted);font-size:.82rem;">${s.dep}</td>
+      <td class="c">${s.exactos > 0 ? `<span class="exact-star">${s.exactos} ⭐</span>` : '—'}</td>
+      <td class="c"><span class="pts-pill">${s.total} pts</span></td>
+    </tr>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════
+   RENDER GLOBAL + BOTONES DE PARTIDOS CONFIRMADOS
+═══════════════════════════════════════════ */
+function renderAll() {
+  [1,2,3].forEach(pId => {
+    renderTabla(pId);
+    const p = state.partidos[pId];
+    if (p.confirmado) {
+      const btn = document.getElementById('fbtn-' + pId);
+      btn.disabled = true;
+      btn.textContent = `Colombia ${p.gCol} — ${p.gRiv} ${p.rival}`;
+      document.getElementById('flock-' + pId).style.display = 'flex';
+    }
+  });
+  renderResumen();
+}
+
+/* ═══════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════ */
+load();
+renderAll();
+</script>
+</body>
+</html>
