@@ -1,48 +1,916 @@
--- ══════════════════════════════════════════
--- MUNDIAL 2026 — Setup Supabase
--- Ejecutar en: Supabase > SQL Editor
--- ══════════════════════════════════════════
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pronósticos Mundial 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --amarillo: #FCD116;
+  --azul: #003087;
+  --rojo: #CE1126;
+  --bg: #080d1a;
+  --card: #141e30;
+  --border: rgba(252,209,22,0.18);
+  --border2: rgba(255,255,255,0.07);
+  --text: #eef2ff;
+  --muted: #7a8daa;
+  --win: #22c55e;
+  --draw: #f59e0b;
+  --loss: #ef4444;
+  --admin: #a855f7;
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
--- Tabla participantes
-CREATE TABLE IF NOT EXISTS participantes (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  nombre TEXT NOT NULL UNIQUE,
-  dependencia TEXT NOT NULL,
-  cel TEXT NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+.hero {
+  background: linear-gradient(160deg, #080d1a 0%, #0b1835 55%, #160510 100%);
+  border-bottom: 2px solid var(--amarillo);
+  padding: 2.5rem 1rem 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -80px; left: 50%; transform: translateX(-50%);
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(252,209,22,0.06) 0%, transparent 65%);
+  pointer-events: none;
+}
+.flag { display: flex; justify-content: center; gap: 2px; margin-bottom: 1.2rem; }
+.flag span { height: 5px; border-radius: 3px; }
+.flag .f1 { width: 64px; background: var(--amarillo); }
+.flag .f2 { width: 32px; background: var(--azul); }
+.flag .f3 { width: 32px; background: var(--rojo); }
+.hero h1 { font-family: 'Bebas Neue', sans-serif; font-size: clamp(2.4rem,6vw,4.2rem); letter-spacing: .04em; color: var(--amarillo); line-height: 1; margin-bottom: .35rem; }
+.hero .sub { font-size: .8rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.admin-trigger { position: absolute; bottom: 10px; right: 14px; font-size: .68rem; color: rgba(255,255,255,.15); cursor: pointer; user-select: none; transition: color .2s; }
+.admin-trigger:hover { color: var(--admin); }
+.admin-bar { display: none; background: rgba(168,85,247,.1); border-bottom: 1px solid rgba(168,85,247,.35); padding: .6rem 1rem; text-align: center; font-size: .8rem; color: var(--admin); align-items: center; justify-content: center; gap: 1rem; }
+.admin-bar.visible { display: flex; }
+.btn-admin-out { background: transparent; border: 1px solid rgba(168,85,247,.4); color: var(--admin); border-radius: 5px; padding: 3px 10px; font-size: .75rem; font-family: 'Inter',sans-serif; cursor: pointer; }
 
--- Tabla pronósticos (partido 0 = inaugural México vs Sudáfrica)
-CREATE TABLE IF NOT EXISTS pronosticos (
-  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  participante_id UUID REFERENCES participantes(id) ON DELETE CASCADE,
-  partido_id INTEGER NOT NULL CHECK (partido_id IN (0,1,2,3)),
-  goles_local INTEGER CHECK (goles_local >= 0),
-  goles_visita INTEGER CHECK (goles_visita >= 0),
-  confirmado BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(participante_id, partido_id)
-);
+/* toast */
+.toast { position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: .7rem 1.4rem; font-size: .85rem; color: var(--text); transition: transform .3s; z-index: 200; white-space: nowrap; }
+.toast.show { transform: translateX(-50%) translateY(0); }
 
--- Tabla resultados reales
-CREATE TABLE IF NOT EXISTS resultados (
-  partido_id INTEGER PRIMARY KEY CHECK (partido_id IN (0,1,2,3)),
-  goles_local INTEGER NOT NULL CHECK (goles_local >= 0),
-  goles_visita INTEGER NOT NULL CHECK (goles_visita >= 0),
-  confirmado BOOLEAN DEFAULT TRUE,
-  auto_confirmado BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+/* loading */
+.loading-bar { height: 3px; background: var(--amarillo); width: 0%; transition: width .4s; position: fixed; top: 0; left: 0; z-index: 300; }
 
--- Seguridad: acceso público controlado
-ALTER TABLE participantes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pronosticos ENABLE ROW LEVEL SECURITY;
-ALTER TABLE resultados ENABLE ROW LEVEL SECURITY;
+.wrap { max-width: 1080px; margin: 0 auto; padding: 2rem 1rem 5rem; }
 
-DROP POLICY IF EXISTS "acceso participantes" ON participantes;
-DROP POLICY IF EXISTS "acceso pronosticos" ON pronosticos;
-DROP POLICY IF EXISTS "acceso resultados" ON resultados;
+.registro-section { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 2.5rem; }
+.section-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 1rem; }
+.reg-form { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; }
+@media(max-width:640px){ .reg-form { grid-template-columns: 1fr 1fr; } }
+.field label { display: block; font-size: .72rem; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .06em; }
+.field input { width: 100%; height: 40px; background: var(--bg); border: 1px solid rgba(252,209,22,.25); border-radius: 7px; color: var(--text); font-size: .9rem; font-family: 'Inter',sans-serif; padding: 0 12px; transition: border-color .2s; }
+.field input:focus { outline: none; border-color: var(--amarillo); }
+.btn-add { height: 40px; background: var(--amarillo); color: var(--bg); border: none; border-radius: 7px; padding: 0 1.2rem; font-size: .88rem; font-weight: 600; font-family: 'Inter',sans-serif; cursor: pointer; white-space: nowrap; transition: opacity .15s, transform .1s; }
+.btn-add:hover { opacity: .88; transform: translateY(-1px); }
+.btn-add:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
-CREATE POLICY "acceso participantes" ON participantes FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "acceso pronosticos"   ON pronosticos   FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "acceso resultados"    ON resultados     FOR ALL USING (true) WITH CHECK (true);
+.partido-block { margin-bottom: 3rem; }
+.partido-head { display: flex; align-items: center; gap: .9rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.p-badge { font-family: 'Bebas Neue', sans-serif; font-size: .72rem; letter-spacing: .1em; background: var(--amarillo); color: var(--bg); padding: 3px 10px; border-radius: 3px; }
+.p-badge.inaugural { background: #f97316; }
+.p-matchup { font-size: 1rem; font-weight: 600; }
+.p-matchup .vs { color: var(--muted); font-weight: 400; font-size: .82rem; margin: 0 5px; }
+.p-meta { font-size: .75rem; color: var(--muted); margin-left: auto; text-align: right; line-height: 1.5; }
+.p-divider { height: 1px; background: var(--border); margin-bottom: 1.1rem; }
+
+.countdown-tag { font-size: .72rem; padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(252,209,22,.3); color: var(--amarillo); background: rgba(252,209,22,.07); font-variant-numeric: tabular-nums; }
+.countdown-tag.live { border-color: rgba(34,197,94,.4); color: var(--win); background: rgba(34,197,94,.08); }
+.countdown-tag.done { border-color: rgba(255,255,255,.1); color: var(--muted); background: transparent; }
+
+.tabla-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border2); }
+table { width: 100%; border-collapse: collapse; font-size: .86rem; }
+thead th { background: var(--card); color: var(--muted); font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; padding: .7rem 1rem; text-align: left; border-bottom: 1px solid var(--border2); }
+th.c, td.c { text-align: center; }
+tbody tr { border-bottom: 1px solid rgba(255,255,255,.04); transition: background .15s; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: rgba(252,209,22,.025); }
+tbody td { padding: .65rem 1rem; vertical-align: middle; }
+.td-name { font-weight: 500; }
+.td-dep, .td-cel { font-size: .8rem; color: var(--muted); }
+
+.marc { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.marc-sep { color: var(--muted); font-weight: 600; user-select: none; }
+.btn-ok { height: 30px; padding: 0 12px; border-radius: 5px; background: rgba(252,209,22,.12); color: var(--amarillo); border: 1px solid rgba(252,209,22,.3); font-size: .78rem; font-weight: 600; font-family: 'Inter',sans-serif; cursor: pointer; transition: background .15s; }
+.btn-ok:hover { background: rgba(252,209,22,.22); }
+.btn-admin-edit { height: 26px; padding: 0 9px; border-radius: 5px; background: rgba(168,85,247,.12); color: var(--admin); border: 1px solid rgba(168,85,247,.3); font-size: .72rem; font-weight: 600; font-family: 'Inter',sans-serif; cursor: pointer; margin-left: 4px; }
+.btn-admin-del { height: 26px; padding: 0 9px; border-radius: 5px; background: rgba(239,68,68,.1); color: var(--loss); border: 1px solid rgba(239,68,68,.25); font-size: .72rem; font-weight: 600; font-family: 'Inter',sans-serif; cursor: pointer; margin-left: 4px; }
+.confirmed-mark { font-size: .78rem; color: var(--muted); display: flex; align-items: center; gap: 4px; justify-content: center; }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.b-win  { background: rgba(34,197,94,.14);  color: var(--win);  border: 1px solid rgba(34,197,94,.3); }
+.b-draw { background: rgba(245,158,11,.14); color: var(--draw); border: 1px solid rgba(245,158,11,.3); }
+.b-loss { background: rgba(239,68,68,.14);  color: var(--loss); border: 1px solid rgba(239,68,68,.3); }
+.b-pend { color: var(--muted); border: 1px solid rgba(255,255,255,.1); font-size: .66rem; }
+
+.final-row { display: flex; align-items: center; gap: 12px; margin-top: 1rem; flex-wrap: wrap; }
+.lock-tag { font-size: .77rem; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+.btn-admin-unlock { height: 32px; padding: 0 12px; border-radius: 6px; background: rgba(168,85,247,.12); color: var(--admin); border: 1px solid rgba(168,85,247,.3); font-size: .78rem; font-weight: 600; font-family: 'Inter',sans-serif; cursor: pointer; display: none; }
+
+.resumen { margin-top: 3.5rem; padding: 1.75rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+.res-title { font-family: 'Bebas Neue', sans-serif; font-size: 1.6rem; letter-spacing: .06em; color: var(--amarillo); margin-bottom: 1.25rem; }
+.scores-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 1rem; margin-bottom: 1.75rem; }
+.score-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; }
+.sc-label { font-size: .67rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 4px; }
+.sc-num { font-family: 'Bebas Neue', sans-serif; font-size: 2.4rem; color: var(--amarillo); line-height: 1; }
+.sc-num.pend { font-size: 1rem; color: var(--muted); font-family: 'Inter',sans-serif; }
+.sc-desc { font-size: .77rem; color: var(--muted); margin-top: 2px; }
+.pos-table { width: 100%; border-collapse: collapse; }
+.pos-table th { font-size: .67rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: 6px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+.pos-table td { padding: 8px 12px; font-size: .85rem; border-bottom: 1px solid rgba(255,255,255,.04); }
+.pos-table tr:last-child td { border-bottom: none; }
+.pts-pill { display: inline-block; background: rgba(252,209,22,.12); color: var(--amarillo); border-radius: 4px; padding: 2px 9px; font-size: .78rem; font-weight: 600; }
+.exact-star { color: var(--amarillo); font-weight: 600; }
+
+footer { text-align: center; padding: 1.5rem; font-size: .74rem; color: var(--muted); border-top: 1px solid var(--border); margin-top: 2rem; }
+
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 100; align-items: center; justify-content: center; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 2rem; max-width: 420px; width: 90%; }
+.modal h2 { font-size: 1.1rem; font-weight: 600; margin-bottom: .35rem; }
+.modal p { font-size: .85rem; color: var(--muted); margin-bottom: 1.25rem; line-height: 1.6; }
+.modal-fields { display: flex; flex-direction: column; gap: .9rem; margin-bottom: 1.5rem; }
+.modal-fields label { font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: block; margin-bottom: 5px; }
+.modal-fields input { width: 100%; height: 40px; background: var(--bg); border: 1px solid rgba(252,209,22,.25); border-radius: 7px; color: var(--text); font-size: .92rem; font-family: 'Inter',sans-serif; padding: 0 12px; }
+.modal-fields input:focus { outline: none; border-color: var(--amarillo); }
+.marc-pair { display: flex; align-items: center; gap: 10px; }
+.marc-pair input { width: 60px; height: 44px; text-align: center; font-size: 1.2rem; font-weight: 600; color: var(--amarillo); }
+.marc-pair .sep { font-size: 1.3rem; color: var(--muted); }
+.modal-btns { display: flex; gap: 10px; justify-content: flex-end; }
+.btn-cancel { height: 38px; padding: 0 1.1rem; background: transparent; color: var(--muted); border: 1px solid var(--border2); border-radius: 7px; font-family: 'Inter',sans-serif; font-size: .85rem; cursor: pointer; }
+.btn-confirm-ok { height: 38px; padding: 0 1.3rem; background: var(--amarillo); color: var(--bg); border: none; border-radius: 7px; font-family: 'Inter',sans-serif; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.btn-confirm-admin { height: 38px; padding: 0 1.3rem; background: var(--admin); color: #fff; border: none; border-radius: 7px; font-family: 'Inter',sans-serif; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.modal-warn { font-size: .77rem; color: var(--loss); margin-top: .75rem; display: none; padding: 8px 10px; background: rgba(239,68,68,.08); border-radius: 6px; }
+.admin-modal .modal { border-color: rgba(168,85,247,.4); }
+</style>
+</head>
+<body>
+
+<div class="loading-bar" id="loading-bar"></div>
+<div class="toast" id="toast"></div>
+
+<header class="hero">
+  <div class="flag"><span class="f1"></span><span class="f2"></span><span class="f3"></span></div>
+  <h1>Pronósticos Mundial 2026</h1>
+  <p class="sub">Partido Inaugural · Grupo K Colombia · Mundial 2026</p>
+  <span class="admin-trigger" onclick="abrirModalAdmin()" title="Admin">⚙</span>
+</header>
+
+<div class="admin-bar" id="admin-bar">
+  <span>🔐 Modo administrador activo</span>
+  <button class="btn-admin-out" onclick="cerrarAdmin()">Salir</button>
+</div>
+
+<div class="wrap">
+
+  <!-- REGISTRO -->
+  <div class="registro-section">
+    <div class="section-label">Registrar participante</div>
+    <div class="reg-form">
+      <div class="field"><label>Nombre completo</label><input id="r-nombre" type="text" placeholder="Tu nombre" autocomplete="off"></div>
+      <div class="field"><label>Dependencia</label><input id="r-dep" type="text" placeholder="Área o dependencia" autocomplete="off"></div>
+      <div class="field"><label>Celular</label><input id="r-cel" type="tel" placeholder="300 000 0000" autocomplete="off"></div>
+      <button class="btn-add" id="btn-agregar" onclick="agregarParticipante()">+ Agregar</button>
+    </div>
+    <div id="reg-error" style="color:#ef4444;font-size:.8rem;margin-top:.6rem;display:none;"></div>
+  </div>
+
+  <!-- PARTIDO 0 — INAUGURAL -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge inaugural">Inaugural</span>
+      <span class="p-matchup">🇲🇽 México <span class="vs">vs</span> 🇿🇦 Sudáfrica</span>
+      <span id="cd-0" class="countdown-tag"></span>
+      <span class="p-meta">11 Jun · 5:00 p.m. COT<br>Estadio Azteca · Ciudad de México</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Participante</th><th>Dependencia</th><th>Celular</th><th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th></tr></thead>
+      <tbody id="body-0"></tbody>
+    </table></div>
+    <div class="final-row">
+      <span class="lock-tag" id="flock-0" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="flock-txt-0"></span>
+      </span>
+      <span id="flock-pending-0" style="font-size:.77rem;color:var(--muted);display:none;">⏳ El resultado aparecerá automáticamente al finalizar el partido</span>
+      <button class="btn-admin-unlock" id="ulock-0" onclick="adminDesbloquear(0)">✏️ Editar resultado</button>
+    </div>
+  </section>
+
+  <!-- PARTIDO 1 — Colombia vs Uzbekistán -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 1</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇺🇿 Uzbekistán</span>
+      <span id="cd-1" class="countdown-tag"></span>
+      <span class="p-meta">17 Jun · 9:00 p.m. COT<br>Estadio Azteca · Ciudad de México</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Participante</th><th>Dependencia</th><th>Celular</th><th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th></tr></thead>
+      <tbody id="body-1"></tbody>
+    </table></div>
+    <div class="final-row">
+      <span class="lock-tag" id="flock-1" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="flock-txt-1"></span>
+      </span>
+      <span id="flock-pending-1" style="font-size:.77rem;color:var(--muted);display:none;">⏳ El resultado aparecerá automáticamente al finalizar el partido</span>
+      <button class="btn-admin-unlock" id="ulock-1" onclick="adminDesbloquear(1)">✏️ Editar resultado</button>
+    </div>
+  </section>
+
+  <!-- PARTIDO 2 — Colombia vs RD Congo -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 2</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇨🇩 RD Congo</span>
+      <span id="cd-2" class="countdown-tag"></span>
+      <span class="p-meta">23 Jun · 8:00 p.m. COT<br>Estadio Akron · Guadalajara</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Participante</th><th>Dependencia</th><th>Celular</th><th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th></tr></thead>
+      <tbody id="body-2"></tbody>
+    </table></div>
+    <div class="final-row">
+      <span class="lock-tag" id="flock-2" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="flock-txt-2"></span>
+      </span>
+      <span id="flock-pending-2" style="font-size:.77rem;color:var(--muted);display:none;">⏳ El resultado aparecerá automáticamente al finalizar el partido</span>
+      <button class="btn-admin-unlock" id="ulock-2" onclick="adminDesbloquear(2)">✏️ Editar resultado</button>
+    </div>
+  </section>
+
+  <!-- PARTIDO 3 — Colombia vs Portugal -->
+  <section class="partido-block">
+    <div class="partido-head">
+      <span class="p-badge">Partido 3</span>
+      <span class="p-matchup">🇨🇴 Colombia <span class="vs">vs</span> 🇵🇹 Portugal</span>
+      <span id="cd-3" class="countdown-tag"></span>
+      <span class="p-meta">27 Jun · 6:30 p.m. COT<br>Hard Rock Stadium · Miami</span>
+    </div>
+    <div class="p-divider"></div>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Participante</th><th>Dependencia</th><th>Celular</th><th class="c">Pronóstico</th><th class="c">Confirmado por</th><th class="c">Resultado</th></tr></thead>
+      <tbody id="body-3"></tbody>
+    </table></div>
+    <div class="final-row">
+      <span class="lock-tag" id="flock-3" style="display:none">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <span id="flock-txt-3"></span>
+      </span>
+      <span id="flock-pending-3" style="font-size:.77rem;color:var(--muted);display:none;">⏳ El resultado aparecerá automáticamente al finalizar el partido</span>
+      <button class="btn-admin-unlock" id="ulock-3" onclick="adminDesbloquear(3)">✏️ Editar resultado</button>
+    </div>
+  </section>
+
+  <!-- RESUMEN -->
+  <div class="resumen">
+    <div class="res-title">📊 Tabla de posiciones</div>
+    <div class="scores-grid" id="scores-grid"></div>
+    <div class="tabla-wrap"><table class="pos-table">
+      <thead><tr><th>#</th><th>Participante</th><th>Dependencia</th><th class="c">Exactos</th><th class="c">Puntos</th></tr></thead>
+      <tbody id="body-resumen"></tbody>
+    </table></div>
+  </div>
+</div>
+
+<footer>Mundial 2026 🇨🇴 · Grupo K · Partido Inaugural · Hecho con pasión tricolor</footer>
+
+<!-- MODAL LOGIN ADMIN -->
+<div class="modal-bg admin-modal" id="modal-admin-login">
+  <div class="modal">
+    <h2>🔐 Acceso administrador</h2>
+    <p>Ingresa la contraseña para activar el modo administrador.</p>
+    <div class="modal-fields">
+      <div><label>Contraseña</label><input id="admin-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')loginAdmin()"></div>
+    </div>
+    <div class="modal-warn" id="admin-warn"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModalAdminLogin()">Cancelar</button>
+      <button class="btn-confirm-admin" onclick="loginAdmin()">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PRONÓSTICO -->
+<div class="modal-bg" id="modal-pron">
+  <div class="modal">
+    <h2 id="mp-title">Confirmar tu pronóstico</h2>
+    <p>Ingresa el marcador que pronosticas. Una vez confirmado no podrás cambiarlo.</p>
+    <div class="modal-fields">
+      <div><label>Tu nombre (debe coincidir exactamente)</label><input id="mp-nombre" type="text" placeholder="Nombre exacto"></div>
+      <div>
+        <label id="mp-marc-label">Marcador</label>
+        <div class="marc-pair">
+          <input id="mp-local" type="number" min="0" max="20" placeholder="0">
+          <span class="sep">—</span>
+          <input id="mp-visita" type="number" min="0" max="20" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-warn" id="mp-warn"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModalPron()">Cancelar</button>
+      <button class="btn-confirm-ok" id="mp-btn-ok" onclick="confirmarPron()">Confirmar pronóstico</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RESULTADO FINAL (solo admin) -->
+<div class="modal-bg admin-modal" id="modal-final">
+  <div class="modal">
+    <h2 id="mf-title">🔐 Ingresar resultado real</h2>
+    <p>Solo visible para el administrador.</p>
+    <div class="modal-fields">
+      <div>
+        <label id="mf-marc-label">Marcador final</label>
+        <div class="marc-pair">
+          <input id="mf-local" type="number" min="0" max="30" placeholder="0">
+          <span class="sep">—</span>
+          <input id="mf-visita" type="number" min="0" max="30" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-warn" id="mf-warn"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarModalFinal()">Cancelar</button>
+      <button class="btn-confirm-admin" onclick="confirmarFinal()">🔒 Confirmar y bloquear</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ADMIN EDITAR PRONÓSTICO -->
+<div class="modal-bg admin-modal" id="modal-admin-edit">
+  <div class="modal">
+    <h2 id="ae-title">✏️ Editar pronóstico</h2>
+    <p>Modo administrador — puedes modificar o eliminar este pronóstico.</p>
+    <div class="modal-fields">
+      <div>
+        <label id="ae-marc-label">Marcador</label>
+        <div class="marc-pair">
+          <input id="ae-local" type="number" min="0" max="20" placeholder="0">
+          <span class="sep">—</span>
+          <input id="ae-visita" type="number" min="0" max="20" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="modal-warn" id="ae-warn"></div>
+    <div class="modal-btns" style="justify-content:space-between;">
+      <button class="btn-admin-del" onclick="adminEliminarPron()">🗑 Eliminar</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-cancel" onclick="cerrarModalAdminEdit()">Cancelar</button>
+        <button class="btn-confirm-admin" onclick="adminGuardarPron()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════ */
+const SUPA_URL = 'https://iqhjykmjwopojtdvuxpw.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaGp5a21qd29wb2p0ZHZ1eHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODk1MTIsImV4cCI6MjA5Njc2NTUxMn0.WqDzNUz4j15jepsB6XH_ZObXObe18_eyMmqoL6UJKC0';
+
+const headers = {
+  'Content-Type': 'application/json',
+  'apikey': SUPA_KEY,
+  'Authorization': `Bearer ${SUPA_KEY}`,
+  'Prefer': 'return=representation'
+};
+
+async function dbGet(tabla, params='') {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { headers });
+  return r.json();
+}
+async function dbPost(tabla, body) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}`, { method:'POST', headers, body: JSON.stringify(body) });
+  return r.json();
+}
+async function dbPatch(tabla, params, body) {
+  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { method:'PATCH', headers, body: JSON.stringify(body) });
+  return r.json();
+}
+async function dbDelete(tabla, params) {
+  await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { method:'DELETE', headers });
+}
+
+/* ═══════════════════════════════════════
+   ESTADO LOCAL (cache)
+═══════════════════════════════════════ */
+const PARTIDOS_INFO = {
+  0: { local:'México',     visita:'Sudáfrica',  etiqueta:'Inaugural' },
+  1: { local:'Colombia',   visita:'Uzbekistán', etiqueta:'Partido 1' },
+  2: { local:'Colombia',   visita:'RD Congo',   etiqueta:'Partido 2' },
+  3: { local:'Colombia',   visita:'Portugal',   etiqueta:'Partido 3' },
+};
+
+const PARTIDO_INICIO = {
+  0: new Date('2026-06-11T22:00:00Z'),
+  1: new Date('2026-06-18T02:00:00Z'),
+  2: new Date('2026-06-24T01:00:00Z'),
+  3: new Date('2026-06-28T23:30:00Z'),
+};
+const PARTIDO_FIN = {
+  0: new Date('2026-06-12T00:00:00Z'),
+  1: new Date('2026-06-18T04:00:00Z'),
+  2: new Date('2026-06-24T03:00:00Z'),
+  3: new Date('2026-06-29T01:30:00Z'),
+};
+
+// Resultados automáticos — descomentar tras cada partido
+const RESULTADOS_AUTO = {
+  // 0: { gLocal:0, gVisita:0 },
+  // 1: { gLocal:0, gVisita:0 },
+  // 2: { gLocal:0, gVisita:0 },
+  // 3: { gLocal:0, gVisita:0 },
+};
+
+let participantes = [];   // [{id, nombre, dependencia, cel}]
+let pronosticos   = {};   // pId -> { participanteId -> {id, gLocal, gVisita, confirmado} }
+let resultados    = {};   // pId -> {gLocal, gVisita, confirmado, autoConfirmado}
+let adminActivo   = false;
+let _mp = {}, _mf = {}, _ae = {};
+
+/* ═══════════════════════════════════════
+   LOADING / TOAST
+═══════════════════════════════════════ */
+function setLoading(pct) {
+  document.getElementById('loading-bar').style.width = pct+'%';
+  if(pct>=100) setTimeout(()=>document.getElementById('loading-bar').style.width='0%',400);
+}
+function toast(msg, ms=2800) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), ms);
+}
+
+/* ═══════════════════════════════════════
+   CARGAR DATOS
+═══════════════════════════════════════ */
+async function cargarTodo() {
+  setLoading(20);
+  try {
+    const [pars, prons, ress] = await Promise.all([
+      dbGet('participantes', 'order=created_at.asc'),
+      dbGet('pronosticos', 'order=created_at.asc'),
+      dbGet('resultados', 'order=partido_id.asc'),
+    ]);
+    setLoading(70);
+
+    participantes = Array.isArray(pars) ? pars : [];
+
+    pronosticos = {};
+    [0,1,2,3].forEach(p => pronosticos[p] = {});
+    if (Array.isArray(prons)) {
+      prons.forEach(pr => {
+        if (!pronosticos[pr.partido_id]) pronosticos[pr.partido_id] = {};
+        pronosticos[pr.partido_id][pr.participante_id] = pr;
+      });
+    }
+
+    resultados = {};
+    if (Array.isArray(ress)) {
+      ress.forEach(r => resultados[r.partido_id] = r);
+    }
+
+    setLoading(100);
+    renderAll();
+  } catch(e) {
+    toast('⚠️ Error al cargar datos. Verifica la conexión.');
+    setLoading(100);
+  }
+}
+
+/* ═══════════════════════════════════════
+   PARTICIPANTES
+═══════════════════════════════════════ */
+async function agregarParticipante() {
+  const nombre = document.getElementById('r-nombre').value.trim();
+  const dep    = document.getElementById('r-dep').value.trim();
+  const cel    = document.getElementById('r-cel').value.trim();
+  const err    = document.getElementById('reg-error');
+  const btn    = document.getElementById('btn-agregar');
+
+  if (!nombre||!dep||!cel) { showErr(err,'Completa todos los campos.'); return; }
+  if (participantes.find(p=>p.nombre.toLowerCase()===nombre.toLowerCase())) {
+    showErr(err,'Ya existe un participante con ese nombre.'); return;
+  }
+  err.style.display='none';
+  btn.disabled=true; btn.textContent='Guardando...';
+
+  try {
+    const res = await dbPost('participantes', {nombre, dependencia:dep, cel});
+    if (res && res[0]) {
+      participantes.push(res[0]);
+      toast(`✅ ${nombre} registrado correctamente`);
+      document.getElementById('r-nombre').value='';
+      document.getElementById('r-dep').value='';
+      document.getElementById('r-cel').value='';
+      renderAll();
+    } else {
+      showErr(err,'Error al guardar. Intenta de nuevo.');
+    }
+  } catch(e) { showErr(err,'Error de conexión.'); }
+  btn.disabled=false; btn.textContent='+ Agregar';
+}
+
+function showErr(el,msg){el.textContent=msg;el.style.display='block';}
+
+/* ═══════════════════════════════════════
+   RENDER TABLAS
+═══════════════════════════════════════ */
+function renderTabla(pId) {
+  const tbody = document.getElementById('body-'+pId);
+  const info  = PARTIDOS_INFO[pId];
+  const res   = resultados[pId];
+  const pConf = res && res.confirmado;
+
+  if (participantes.length===0) {
+    tbody.innerHTML=`<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;font-size:.85rem;">Aún no hay participantes registrados.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = participantes.map(par => {
+    const pr = pronosticos[pId] && pronosticos[pId][par.id];
+    let marcCell;
+    if (pr && pr.confirmado) {
+      marcCell = `<div class="marc">
+        <span style="color:var(--amarillo);font-weight:600;">${pr.goles_local}</span>
+        <span class="marc-sep">—</span>
+        <span style="color:var(--amarillo);font-weight:600;">${pr.goles_visita}</span>
+        ${adminActivo ? `<button class="btn-admin-edit" onclick="abrirAdminEdit(${pId},'${par.id}')">✏️</button>` : ''}
+      </div>`;
+    } else if (pConf) {
+      marcCell = `<span style="color:var(--muted);font-size:.8rem;">Sin pronóstico</span>
+        ${adminActivo ? `<button class="btn-admin-edit" onclick="abrirAdminEdit(${pId},'${par.id}')">✏️ agregar</button>` : ''}`;
+    } else {
+      marcCell = `<button class="btn-ok" onclick="abrirModalPron(${pId},'${par.id}','${par.nombre.replace(/'/g,"\\'")}')">Ingresar pronóstico</button>`;
+    }
+
+    const confCell = (pr && pr.confirmado)
+      ? `<span class="confirmed-mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--win)" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>${par.nombre.split(' ')[0]}</span>`
+      : `<span style="color:var(--muted);font-size:.75rem;">Pendiente</span>`;
+
+    const adminDelBtn = adminActivo
+      ? `<button class="btn-admin-del" style="margin-left:6px;font-size:.68rem;" onclick="adminEliminarParticipante('${par.id}','${par.nombre.replace(/'/g,"\\'")}')">✕</button>`
+      : '';
+
+    return `<tr>
+      <td class="td-name">${par.nombre}${adminDelBtn}</td>
+      <td class="td-dep">${par.dependencia}</td>
+      <td class="td-cel">${par.cel}</td>
+      <td class="c">${marcCell}</td>
+      <td class="c">${confCell}</td>
+      <td class="c">${resultadoBadge(pId, par.id)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function resultadoBadge(pId, parId) {
+  const res = resultados[pId];
+  if (!res||!res.confirmado) return `<span class="badge b-pend">Pendiente</span>`;
+  const pr = pronosticos[pId]&&pronosticos[pId][parId];
+  if (!pr||!pr.confirmado) return `<span class="badge b-loss">Sin pronóstico</span>`;
+  const pts = calcPts(pId, parId);
+  if (pts===3) return `<span class="badge b-win">✓ Exacto</span>`;
+  if (pts===1) return `<span class="badge b-draw">~ Resultado</span>`;
+  return `<span class="badge b-loss">✗ Fallado</span>`;
+}
+
+function calcPts(pId, parId) {
+  const res = resultados[pId];
+  if (!res||!res.confirmado) return null;
+  const pr = pronosticos[pId]&&pronosticos[pId][parId];
+  if (!pr||!pr.confirmado) return 0;
+  if (pr.goles_local===res.goles_local && pr.goles_visita===res.goles_visita) return 3;
+  return Math.sign(pr.goles_local-pr.goles_visita)===Math.sign(res.goles_local-res.goles_visita)?1:0;
+}
+
+/* ═══════════════════════════════════════
+   MODAL PRONÓSTICO
+═══════════════════════════════════════ */
+function abrirModalPron(pId, parId, nombre) {
+  _mp = {pId, parId, nombre};
+  const info = PARTIDOS_INFO[pId];
+  document.getElementById('mp-title').textContent=`${info.etiqueta} · ${info.local} vs ${info.visita}`;
+  document.getElementById('mp-marc-label').textContent=`Marcador (${info.local} — ${info.visita})`;
+  document.getElementById('mp-nombre').value='';
+  document.getElementById('mp-local').value='';
+  document.getElementById('mp-visita').value='';
+  document.getElementById('mp-warn').style.display='none';
+  document.getElementById('modal-pron').classList.add('open');
+}
+function cerrarModalPron(){ document.getElementById('modal-pron').classList.remove('open'); }
+
+async function confirmarPron() {
+  const nombre  = document.getElementById('mp-nombre').value.trim();
+  const local   = document.getElementById('mp-local').value;
+  const visita  = document.getElementById('mp-visita').value;
+  const warn    = document.getElementById('mp-warn');
+  const btn     = document.getElementById('mp-btn-ok');
+
+  if (nombre.toLowerCase()!==_mp.nombre.toLowerCase()) {
+    warn.textContent=`⚠️ El nombre no coincide. Escribe exactamente: "${_mp.nombre}"`;
+    warn.style.display='block'; return;
+  }
+  if (local===''||visita==='') { warn.textContent='⚠️ Ingresa ambos marcadores.'; warn.style.display='block'; return; }
+  const gl=parseInt(local), gv=parseInt(visita);
+  if (isNaN(gl)||isNaN(gv)||gl<0||gv<0) { warn.textContent='⚠️ Marcadores deben ser ≥ 0.'; warn.style.display='block'; return; }
+
+  btn.disabled=true; btn.textContent='Guardando...';
+  try {
+    const existe = pronosticos[_mp.pId]&&pronosticos[_mp.pId][_mp.parId];
+    let res;
+    if (existe) {
+      res = await dbPatch('pronosticos', `id=eq.${existe.id}`, {goles_local:gl, goles_visita:gv, confirmado:true});
+    } else {
+      res = await dbPost('pronosticos', {participante_id:_mp.parId, partido_id:_mp.pId, goles_local:gl, goles_visita:gv, confirmado:true});
+    }
+    if (res && res[0]) {
+      if (!pronosticos[_mp.pId]) pronosticos[_mp.pId]={};
+      pronosticos[_mp.pId][_mp.parId] = res[0];
+      toast('✅ Pronóstico guardado');
+      cerrarModalPron(); renderAll();
+    } else { warn.textContent='⚠️ Error al guardar.'; warn.style.display='block'; }
+  } catch(e) { warn.textContent='⚠️ Error de conexión.'; warn.style.display='block'; }
+  btn.disabled=false; btn.textContent='Confirmar pronóstico';
+}
+
+/* ═══════════════════════════════════════
+   MODAL RESULTADO FINAL (admin)
+═══════════════════════════════════════ */
+function abrirModalFinal(pId) {
+  if (!adminActivo) return;
+  _mf.pId=pId;
+  const info=PARTIDOS_INFO[pId];
+  document.getElementById('mf-title').textContent=`🔐 Resultado · ${info.local} vs ${info.visita}`;
+  document.getElementById('mf-marc-label').textContent=`Marcador final (${info.local} — ${info.visita})`;
+  const r=resultados[pId];
+  document.getElementById('mf-local').value=r?r.goles_local:'';
+  document.getElementById('mf-visita').value=r?r.goles_visita:'';
+  document.getElementById('mf-warn').style.display='none';
+  document.getElementById('modal-final').classList.add('open');
+}
+function cerrarModalFinal(){ document.getElementById('modal-final').classList.remove('open'); }
+
+async function confirmarFinal() {
+  const local  = document.getElementById('mf-local').value;
+  const visita = document.getElementById('mf-visita').value;
+  const warn   = document.getElementById('mf-warn');
+  if (local===''||visita==='') { warn.textContent='⚠️ Ingresa ambos marcadores.'; warn.style.display='block'; return; }
+  const gl=parseInt(local), gv=parseInt(visita);
+  if (isNaN(gl)||isNaN(gv)||gl<0||gv<0) { warn.textContent='⚠️ Valores inválidos.'; warn.style.display='block'; return; }
+  await aplicarResultado(_mf.pId, gl, gv, false);
+  cerrarModalFinal();
+}
+
+async function aplicarResultado(pId, gl, gv, esAuto) {
+  try {
+    const existe = resultados[pId];
+    let res;
+    if (existe) {
+      res = await dbPatch('resultados', `partido_id=eq.${pId}`, {goles_local:gl, goles_visita:gv, confirmado:true, auto_confirmado:esAuto});
+    } else {
+      res = await dbPost('resultados', {partido_id:pId, goles_local:gl, goles_visita:gv, confirmado:true, auto_confirmado:esAuto});
+    }
+    if (res&&res[0]) {
+      resultados[pId]=res[0];
+      toast(`✅ Resultado guardado: ${PARTIDOS_INFO[pId].local} ${gl} — ${gv} ${PARTIDOS_INFO[pId].visita}`);
+      renderAll();
+    }
+  } catch(e) { toast('⚠️ Error al guardar resultado.'); }
+}
+
+/* ═══════════════════════════════════════
+   ADMIN
+═══════════════════════════════════════ */
+function abrirModalAdmin() {
+  if (adminActivo) { cerrarAdmin(); return; }
+  document.getElementById('admin-pass').value='';
+  document.getElementById('admin-warn').style.display='none';
+  document.getElementById('modal-admin-login').classList.add('open');
+  setTimeout(()=>document.getElementById('admin-pass').focus(),100);
+}
+function cerrarModalAdminLogin(){ document.getElementById('modal-admin-login').classList.remove('open'); }
+
+async function loginAdmin() {
+  const pass=document.getElementById('admin-pass').value;
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pass));
+  const hash=Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  const cbuf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('P0ll4C0l0mb1@'));
+  const correct=Array.from(new Uint8Array(cbuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+  if (hash===correct) {
+    adminActivo=true;
+    cerrarModalAdminLogin();
+    document.getElementById('admin-bar').classList.add('visible');
+    renderAll();
+  } else {
+    const w=document.getElementById('admin-warn');
+    w.textContent='⚠️ Contraseña incorrecta.'; w.style.display='block';
+  }
+}
+function cerrarAdmin(){ adminActivo=false; document.getElementById('admin-bar').classList.remove('visible'); renderAll(); }
+
+function adminDesbloquear(pId) {
+  if (!adminActivo) return;
+  abrirModalFinal(pId);
+}
+
+/* editar pronóstico */
+function abrirAdminEdit(pId, parId) {
+  if (!adminActivo) return;
+  _ae={pId, parId};
+  const info=PARTIDOS_INFO[pId];
+  const par=participantes.find(p=>p.id===parId);
+  const pr=pronosticos[pId]&&pronosticos[pId][parId];
+  document.getElementById('ae-title').textContent=`✏️ ${par?par.nombre:'?'} — ${info.etiqueta}`;
+  document.getElementById('ae-marc-label').textContent=`Marcador (${info.local} — ${info.visita})`;
+  document.getElementById('ae-local').value=pr?pr.goles_local:'';
+  document.getElementById('ae-visita').value=pr?pr.goles_visita:'';
+  document.getElementById('ae-warn').style.display='none';
+  document.getElementById('modal-admin-edit').classList.add('open');
+}
+function cerrarModalAdminEdit(){ document.getElementById('modal-admin-edit').classList.remove('open'); }
+
+async function adminGuardarPron() {
+  const local=document.getElementById('ae-local').value;
+  const visita=document.getElementById('ae-visita').value;
+  const warn=document.getElementById('ae-warn');
+  if (local===''||visita==='') { warn.textContent='⚠️ Ingresa ambos.'; warn.style.display='block'; return; }
+  const gl=parseInt(local),gv=parseInt(visita);
+  if (isNaN(gl)||isNaN(gv)||gl<0||gv<0) { warn.textContent='⚠️ Valores inválidos.'; warn.style.display='block'; return; }
+  try {
+    const existe=pronosticos[_ae.pId]&&pronosticos[_ae.pId][_ae.parId];
+    let res;
+    if (existe) {
+      res=await dbPatch('pronosticos',`id=eq.${existe.id}`,{goles_local:gl,goles_visita:gv,confirmado:true});
+    } else {
+      res=await dbPost('pronosticos',{participante_id:_ae.parId,partido_id:_ae.pId,goles_local:gl,goles_visita:gv,confirmado:true});
+    }
+    if (res&&res[0]) {
+      if (!pronosticos[_ae.pId]) pronosticos[_ae.pId]={};
+      pronosticos[_ae.pId][_ae.parId]=res[0];
+      toast('✅ Pronóstico actualizado');
+      cerrarModalAdminEdit(); renderAll();
+    }
+  } catch(e){ warn.textContent='⚠️ Error al guardar.'; warn.style.display='block'; }
+}
+
+async function adminEliminarPron() {
+  if (!confirm('¿Eliminar este pronóstico?')) return;
+  const pr=pronosticos[_ae.pId]&&pronosticos[_ae.pId][_ae.parId];
+  if (pr) {
+    await dbDelete('pronosticos',`id=eq.${pr.id}`);
+    delete pronosticos[_ae.pId][_ae.parId];
+  }
+  toast('🗑 Pronóstico eliminado');
+  cerrarModalAdminEdit(); renderAll();
+}
+
+async function adminEliminarParticipante(parId, nombre) {
+  if (!adminActivo) return;
+  if (!confirm(`¿Eliminar a "${nombre}" y todos sus pronósticos?`)) return;
+  await dbDelete('participantes',`id=eq.${parId}`);
+  participantes=participantes.filter(p=>p.id!==parId);
+  [0,1,2,3].forEach(pId=>{ if(pronosticos[pId]) delete pronosticos[pId][parId]; });
+  toast(`🗑 ${nombre} eliminado`);
+  renderAll();
+}
+
+/* ═══════════════════════════════════════
+   RESUMEN
+═══════════════════════════════════════ */
+function renderResumen() {
+  const sg=document.getElementById('scores-grid');
+  sg.innerHTML=[0,1,2,3].map(pId=>{
+    const info=PARTIDOS_INFO[pId];
+    const r=resultados[pId];
+    if (!r||!r.confirmado) return `<div class="score-card">
+      <div class="sc-label">${info.etiqueta} · ${info.local} vs ${info.visita}</div>
+      <div class="sc-num pend">Por jugar</div>
+    </div>`;
+    const who=r.goles_local>r.goles_visita?`${info.local} gana`:r.goles_local<r.goles_visita?`${info.visita} gana`:'Empate';
+    return `<div class="score-card">
+      <div class="sc-label">${info.etiqueta} · ${info.local} vs ${info.visita}</div>
+      <div class="sc-num">${r.goles_local} — ${r.goles_visita}</div>
+      <div class="sc-desc">${who}${r.auto_confirmado?' · automático':''}</div>
+    </div>`;
+  }).join('');
+
+  const tbody=document.getElementById('body-resumen');
+  if (participantes.length===0) {
+    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:1.5rem;font-size:.85rem;">Sin participantes aún.</td></tr>`;
+    return;
+  }
+  const scores=participantes.map(par=>{
+    let total=0,exactos=0;
+    [0,1,2,3].forEach(pId=>{const pts=calcPts(pId,par.id);if(pts!==null){total+=pts;if(pts===3)exactos++;}});
+    return {nombre:par.nombre,dep:par.dependencia,total,exactos};
+  }).sort((a,b)=>b.total-a.total||b.exactos-a.exactos);
+  tbody.innerHTML=scores.map((s,i)=>`<tr>
+    <td style="color:var(--muted);font-size:.82rem;">${i===0&&s.total>0?'🏆':`${i+1}°`}</td>
+    <td style="font-weight:500;">${s.nombre}</td>
+    <td style="color:var(--muted);font-size:.82rem;">${s.dep}</td>
+    <td class="c">${s.exactos>0?`<span class="exact-star">${s.exactos} ⭐</span>`:'—'}</td>
+    <td class="c"><span class="pts-pill">${s.total} pts</span></td>
+  </tr>`).join('');
+}
+
+/* ═══════════════════════════════════════
+   BOTONES ESTADO
+═══════════════════════════════════════ */
+function restaurarBotones() {
+  [0,1,2,3].forEach(pId=>{
+    const r=resultados[pId];
+    const conf=r&&r.confirmado;
+    const info=PARTIDOS_INFO[pId];
+    const lockEl=document.getElementById('flock-'+pId);
+    const lockTxt=document.getElementById('flock-txt-'+pId);
+    const pendEl=document.getElementById('flock-pending-'+pId);
+    const ulockEl=document.getElementById('ulock-'+pId);
+    if (conf) {
+      lockEl.style.display='flex';
+      lockTxt.textContent=`${info.local} ${r.goles_local} — ${r.goles_visita} ${info.visita}${r.auto_confirmado?' · auto':''}`;
+      pendEl.style.display='none';
+      ulockEl.style.display=adminActivo?'inline-flex':'none';
+      ulockEl.textContent='✏️ Editar resultado';
+    } else {
+      lockEl.style.display='none';
+      pendEl.style.display='block';
+      ulockEl.style.display=adminActivo?'inline-flex':'none';
+      ulockEl.textContent='➕ Ingresar resultado';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   COUNTDOWN + AUTO
+═══════════════════════════════════════ */
+function formatCountdown(ms) {
+  if (ms<=0) return null;
+  const d=Math.floor(ms/86400000),h=Math.floor((ms%86400000)/3600000),m=Math.floor((ms%3600000)/60000);
+  if(d>0)return`${d}d ${h}h ${m}m`;
+  if(h>0)return`${h}h ${m}m`;
+  return`${m}m`;
+}
+
+function tickCountdowns() {
+  const now=new Date();
+  [0,1,2,3].forEach(async pId=>{
+    const el=document.getElementById('cd-'+pId);
+    const inicio=PARTIDO_INICIO[pId], fin=PARTIDO_FIN[pId];
+    const r=resultados[pId];
+
+    if (!r&&RESULTADOS_AUTO[pId]&&now>=fin) {
+      const auto=RESULTADOS_AUTO[pId];
+      await aplicarResultado(pId,auto.gLocal,auto.gVisita,true);
+    }
+
+    if (r&&r.confirmado) {
+      el.textContent='Finalizado'; el.className='countdown-tag done';
+    } else if (now>=inicio&&now<fin) {
+      el.textContent='EN JUEGO 🟢'; el.className='countdown-tag live';
+    } else if (now<inicio) {
+      const rem=formatCountdown(inicio-now);
+      el.textContent=rem?`⏱ ${rem}`:'Próximamente'; el.className='countdown-tag';
+    } else {
+      el.textContent='Finalizado'; el.className='countdown-tag done';
+    }
+  });
+}
+
+/* ═══════════════════════════════════════
+   RENDER GLOBAL
+═══════════════════════════════════════ */
+function renderAll() {
+  [0,1,2,3].forEach(pId=>renderTabla(pId));
+  restaurarBotones();
+  renderResumen();
+}
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+cargarTodo();
+tickCountdowns();
+setInterval(tickCountdowns, 30000);
+setInterval(cargarTodo, 60000); // refresco automático cada 60s
+</script>
+</body>
+</html>
