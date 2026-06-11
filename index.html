@@ -393,20 +393,25 @@ const headers = {
   'Prefer': 'return=representation'
 };
 
-async function dbGet(tabla, params='') {
-  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { headers });
+async function dbGet(tabla, params) {
+  const url = params ? `${SUPA_URL}/rest/v1/${tabla}?${params}` : `${SUPA_URL}/rest/v1/${tabla}`;
+  const r = await fetch(url, { headers });
+  if (!r.ok) { const e=await r.text(); console.error('GET',tabla,r.status,e); return []; }
   return r.json();
 }
 async function dbPost(tabla, body) {
   const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}`, { method:'POST', headers, body: JSON.stringify(body) });
+  if (!r.ok) { const e=await r.text(); console.error('POST',tabla,r.status,e); throw new Error(e); }
   return r.json();
 }
 async function dbPatch(tabla, params, body) {
   const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { method:'PATCH', headers, body: JSON.stringify(body) });
+  if (!r.ok) { const e=await r.text(); console.error('PATCH',tabla,r.status,e); throw new Error(e); }
   return r.json();
 }
 async function dbDelete(tabla, params) {
-  await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { method:'DELETE', headers });
+  const r = await fetch(`${SUPA_URL}/rest/v1/${tabla}?${params}`, { method:'DELETE', headers });
+  if (!r.ok) { const e=await r.text(); console.error('DELETE',tabla,r.status,e); }
 }
 
 /* ═══════════════════════════════════════
@@ -640,15 +645,15 @@ async function confirmarPron() {
     if (existe) {
       res = await dbPatch('pronosticos', `id=eq.${existe.id}`, {goles_local:gl, goles_visita:gv, confirmado:true});
     } else {
-      res = await dbPost('pronosticos', {participante_id:_mp.parId, partido_id:_mp.pId, goles_local:gl, goles_visita:gv, confirmado:true});
+      res = await dbPost('pronosticos', {participante_id:_mp.parId, partido_id:parseInt(_mp.pId), goles_local:gl, goles_visita:gv, confirmado:true});
     }
     if (res && res[0]) {
       if (!pronosticos[_mp.pId]) pronosticos[_mp.pId]={};
       pronosticos[_mp.pId][_mp.parId] = res[0];
       toast('✅ Pronóstico guardado');
       cerrarModalPron(); renderAll();
-    } else { warn.textContent='⚠️ Error al guardar.'; warn.style.display='block'; }
-  } catch(e) { warn.textContent='⚠️ Error de conexión.'; warn.style.display='block'; }
+    } else { warn.textContent='⚠️ Error al guardar. Ver consola para detalles.'; warn.style.display='block'; }
+  } catch(e) { warn.textContent='⚠️ ' + (e.message||'Error de conexión'); warn.style.display='block'; }
   btn.disabled=false; btn.textContent='Confirmar pronóstico';
 }
 
