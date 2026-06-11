@@ -281,6 +281,10 @@ footer { text-align: center; padding: 1.5rem; font-size: .74rem; color: var(--mu
   <div class="resumen">
     <div class="res-title">📊 Tabla de posiciones</div>
     <div class="scores-grid" id="scores-grid"></div>
+    <div class="tabla-wrap"><table class="pos-table">
+      <thead><tr><th>#</th><th>Participante</th><th>Dependencia</th><th class="c">Exactos</th><th class="c">Puntos</th></tr></thead>
+      <tbody id="body-resumen"></tbody>
+    </table></div>
   </div>
 </div>
 
@@ -381,6 +385,64 @@ footer { text-align: center; padding: 1.5rem; font-size: .74rem; color: var(--mu
 ═══════════════════════════════════════ */
 const SUPA_URL = 'https://iqhjykmjwopojtdvuxpw.supabase.co';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlxaGp5a21qd29wb2p0ZHZ1eHB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExODk1MTIsImV4cCI6MjA5Njc2NTUxMn0.WqDzNUz4j15jepsB6XH_ZObXObe18_eyMmqoL6UJKC0';
+
+/* ═══════════════════════════════════════
+   FOOTBALL-DATA.ORG CONFIG
+═══════════════════════════════════════ */
+const FD_KEY = '6245ceb329374fb98b553ffca027d10c';
+// IDs de los partidos en football-data.org (se detectan automáticamente)
+// partido_id local -> match_id en la API
+const FD_MATCH_IDS = {
+  0: null, // Inaugural México vs Sudáfrica
+  1: null, // Colombia vs Uzbekistán
+  2: null, // Colombia vs RD Congo
+  3: null, // Colombia vs Portugal
+};
+
+// Equipos a buscar por partido
+const FD_TEAMS = {
+  0: { local: 'Mexico',   visita: 'South Africa' },
+  1: { local: 'Colombia', visita: 'Uzbekistan'   },
+  2: { local: 'Colombia', visita: 'DR Congo'      },
+  3: { local: 'Colombia', visita: 'Portugal'      },
+};
+
+async function fetchResultadosAPI() {
+  try {
+    const r = await fetch('https://api.football-data.org/v4/competitions/WC/matches', {
+      headers: { 'X-Auth-Token': FD_KEY }
+    });
+    if (!r.ok) { console.warn('API fútbol no disponible:', r.status); return; }
+    const data = await r.json();
+    const matches = data.matches || [];
+
+    for (const [pId, teams] of Object.entries(FD_TEAMS)) {
+      const pid = parseInt(pId);
+      if (resultados[pid]?.confirmado) continue; // ya tiene resultado
+
+      const match = matches.find(m => {
+        const hn = m.homeTeam?.name || '';
+        const an = m.awayTeam?.name || '';
+        return (hn.includes(teams.local) || teams.local.includes(hn.split(' ')[0])) &&
+               (an.includes(teams.visita) || teams.visita.includes(an.split(' ')[0]));
+      });
+
+      if (!match) continue;
+      FD_MATCH_IDS[pid] = match.id;
+
+      if (match.status === 'FINISHED' && match.score?.fullTime) {
+        const gl = match.score.fullTime.home;
+        const gv = match.score.fullTime.away;
+        if (gl !== null && gv !== null) {
+          console.log(`✅ Resultado auto partido ${pid}: ${gl}-${gv}`);
+          await aplicarResultado(pid, gl, gv, true);
+        }
+      }
+    }
+  } catch(e) {
+    console.warn('Error consultando API de fútbol:', e.message);
+  }
+}
 
 const headers = {
   'Content-Type': 'application/json',
@@ -910,8 +972,10 @@ function renderAll() {
 ═══════════════════════════════════════ */
 cargarTodo();
 tickCountdowns();
+fetchResultadosAPI(); // consultar resultados reales al cargar
 setInterval(tickCountdowns, 30000);
-setInterval(cargarTodo, 60000); // refresco automático cada 60s
+setInterval(cargarTodo, 60000);          // refresco Supabase cada 60s
+setInterval(fetchResultadosAPI, 120000); // consultar API fútbol cada 2 min
 </script>
 </body>
 </html>
